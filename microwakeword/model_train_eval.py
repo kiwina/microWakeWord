@@ -23,6 +23,71 @@ from absl import logging
 
 import tensorflow as tf
 
+# GPU Memory Configuration
+import subprocess
+import re
+
+def get_gpu_memory_mb():
+    try:
+        # Ensure nvidia-smi is in PATH or provide full path
+        result = subprocess.run(['nvidia-smi', '--query-gpu=memory.total', '--format=csv,noheader,nounits'], capture_output=True, text=True, check=True)
+        total_memory_mb = int(result.stdout.strip())
+        return total_memory_mb
+    except FileNotFoundError:
+        print("nvidia-smi command not found. Ensure NVIDIA drivers and CUDA toolkit are installed and nvidia-smi is in PATH.")
+        return None
+    except subprocess.CalledProcessError as e:
+        print(f"nvidia-smi failed with error: {e.stderr}")
+        return None
+    except ValueError:
+        print(f"Could not parse nvidia-smi output: {result.stdout}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred while querying GPU memory: {e}")
+        return None
+
+physical_devices = tf.config.experimental.list_physical_devices('GPU')
+if physical_devices:
+    print(f"Found GPU(s): {physical_devices}")
+    try:
+        total_gpu_mem_mb = get_gpu_memory_mb()
+        if total_gpu_mem_mb:
+            # Calculate 98% of total memory
+            MAX_MEMORY = int(total_gpu_mem_mb * 0.98)
+            print(f"Total GPU Memory: {total_gpu_mem_mb}MB. Setting TensorFlow memory limit to: {MAX_MEMORY}MB for {physical_devices[0].name}")
+            
+            # Disable memory growth and set virtual device configuration
+            # This must be done before any other TF operations that might initialize the GPU
+            tf.config.experimental.set_memory_growth(physical_devices[0], False) 
+            tf.config.experimental.set_virtual_device_configuration(
+                physical_devices[0],
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=MAX_MEMORY)]
+            )
+            print(f"Successfully configured memory for {physical_devices[0].name}.")
+        else:
+            print("Could not determine GPU memory via nvidia-smi. Using default TensorFlow memory management.")
+            # Fallback: enable memory growth if specific limit can't be set
+            for gpu in physical_devices:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            print("Enabled memory growth for all found GPUs as a fallback.")
+            
+    except RuntimeError as e:
+        # Virtual devices must be set before GPUs have been initialized
+        print(f"RuntimeError setting virtual device configuration: {e}. This usually means a TF operation has already initialized the GPU. Memory growth might be enabled by default or try enabling it explicitly.")
+        # Attempt to enable memory growth as a fallback if specific configuration failed late
+        try:
+            for gpu_fallback in physical_devices:
+                if not tf.config.experimental.get_memory_growth(gpu_fallback):
+                     tf.config.experimental.set_memory_growth(gpu_fallback, True)
+                     print(f"Enabled memory growth for {gpu_fallback.name} as a fallback after RuntimeError.")
+        except Exception as e_fallback:
+            print(f"Could not set memory growth as fallback: {e_fallback}")
+    except Exception as e_outer:
+        print(f"An unexpected error occurred during GPU memory configuration: {e_outer}")
+else:
+    print("No GPU found by TensorFlow. Running on CPU.")
+
+# Original GPU disabling logic for ARM Macs follows here
 # Disable GPU by default on ARM Macs, it's slower than just using the CPU
 if os.environ.get("CUDA_VISIBLE_DEVICES") == "-1" or (
     sys.platform == "darwin"

@@ -7,14 +7,14 @@ setuptools.setup(
     name="microwakeword",
     version="0.1.0",
     install_requires=[
-        "audiomentations",
-        "audio_metadata",
-        "datasets",
+        "audiomentations", # Version managed by consuming project or ensure general compatibility
+        # "audio_metadata", # To be removed/replaced
+        "datasets",       # Version managed by consuming project
         "mmap_ninja",
-        "numpy",
-        "pymicro-features",
-        "pyyaml",
-        "tensorflow>=2.16",
+        "numpy>=1.21",    # TF 2.19 base image has 2.1.3; ensure compatibility
+        # "pymicro-features", # Assuming this is installed locally from a fork
+        "pyyaml>=6.0",    # Base image has 6.0.2
+        "tensorflow>=2.19.0,<2.20.0", # Align with base image
         "webrtcvad",
     ],
     author="Kevin Ahrendt",
@@ -33,5 +33,5 @@ setuptools.setup(
     ],
     packages=setuptools.find_packages(),
     include_package_data=True,
-    python_requires=">=3.10, <3.11",
+    python_requires=">=3.11",
 )

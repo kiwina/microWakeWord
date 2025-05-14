@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import audio_metadata
 import datasets
+import soundfile as sf # Added soundfile
 import math
 import os
 import random
@@ -125,8 +125,12 @@ class Clips:
                     not math.isinf(self.max_clip_duration_s)
                 ):
                     for audio_file in paths_to_clips:
-                        metadata = audio_metadata.load(audio_file)
-                        duration = metadata["streaminfo"]["duration"]
+                        try:
+                            info = sf.info(audio_file)
+                            duration = info.duration
+                        except Exception as e:
+                            print(f"Warning: Could not read duration for {audio_file} using soundfile: {e}. Skipping file.")
+                            continue # Skip this file if duration can't be read
                         if (self.min_clip_duration_s < duration) and (
                             duration < self.max_clip_duration_s
                         ):
