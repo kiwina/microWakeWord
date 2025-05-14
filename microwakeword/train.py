@@ -38,7 +38,6 @@ def swap_attribute(obj, attr, temp_value):
         setattr(obj, attr, original_value)
 
 
-@tf.function # Decorate for potential graph compilation
 def validate_nonstreaming(config, data_processor, model, test_set):
     testing_fingerprints, testing_ground_truth, _ = data_processor.get_data(
         test_set,

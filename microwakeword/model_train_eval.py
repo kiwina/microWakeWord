@@ -46,54 +46,55 @@ def get_gpu_memory_mb():
         print(f"An unexpected error occurred while querying GPU memory: {e}")
         return None
 
-physical_devices = tf.config.experimental.list_physical_devices('GPU')
-if physical_devices:
-    print(f"Found GPU(s): {physical_devices}")
-    try:
-        total_gpu_mem_mb = get_gpu_memory_mb()
-        if total_gpu_mem_mb:
-            # Calculate 98% of total memory
-            MAX_MEMORY = int(total_gpu_mem_mb * 0.98)
-            print(f"Total GPU Memory: {total_gpu_mem_mb}MB. Setting TensorFlow memory limit to: {MAX_MEMORY}MB for {physical_devices[0].name}")
-            
-            # Disable memory growth and set virtual device configuration
-            # This must be done before any other TF operations that might initialize the GPU
-            tf.config.experimental.set_memory_growth(physical_devices[0], False) 
-            tf.config.experimental.set_virtual_device_configuration(
-                physical_devices[0],
-                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=MAX_MEMORY)]
-            )
-            print(f"Successfully configured memory for {physical_devices[0].name}.")
-        else:
-            print("Could not determine GPU memory via nvidia-smi. Using default TensorFlow memory management.")
-            # Fallback: enable memory growth if specific limit can't be set
+# Check for environment variable to force CPU-only mode
+use_cpu_only = os.environ.get("MICROWAKEWORD_USE_CPU_ONLY", "0") == "1"
+
+if use_cpu_only:
+    print("MICROWAKEWORD_USE_CPU_ONLY=1 detected, disabling GPU usage.")
+    tf.config.set_visible_devices([], "GPU")
+else:
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    if physical_devices:
+        print(f"Found GPU(s): {physical_devices}")
+        try:
+            # First attempt: Try to use memory growth for all GPUs
             for gpu in physical_devices:
                 tf.config.experimental.set_memory_growth(gpu, True)
-            print("Enabled memory growth for all found GPUs as a fallback.")
+            print(f"Enabled memory growth for GPUs: {physical_devices}")
             
-    except RuntimeError as e:
-        # Virtual devices must be set before GPUs have been initialized
-        print(f"RuntimeError setting virtual device configuration: {e}. This usually means a TF operation has already initialized the GPU. Memory growth might be enabled by default or try enabling it explicitly.")
-        # Attempt to enable memory growth as a fallback if specific configuration failed late
-        try:
-            for gpu_fallback in physical_devices:
-                if not tf.config.experimental.get_memory_growth(gpu_fallback):
-                     tf.config.experimental.set_memory_growth(gpu_fallback, True)
-                     print(f"Enabled memory growth for {gpu_fallback.name} as a fallback after RuntimeError.")
-        except Exception as e_fallback:
-            print(f"Could not set memory growth as fallback: {e_fallback}")
-    except Exception as e_outer:
-        print(f"An unexpected error occurred during GPU memory configuration: {e_outer}")
-else:
-    print("No GPU found by TensorFlow. Running on CPU.")
+            # If memory growth is successful, we can optionally try to set specific memory limits
+            # based on nvidia-smi if available
+            total_gpu_mem_mb = get_gpu_memory_mb()
+            if total_gpu_mem_mb:
+                print(f"Total GPU Memory: {total_gpu_mem_mb}MB (using memory growth mode)")
+        except RuntimeError as e:
+            print(f"Error enabling memory growth: {e}")
+            # If memory growth fails, try a different approach with explicit memory limits
+            try:
+                if len(physical_devices) > 0 and get_gpu_memory_mb():
+                    # Calculate 95% of total memory (slightly more conservative than before)
+                    MAX_MEMORY = int(get_gpu_memory_mb() * 0.95)
+                    print(f"Attempting to set explicit memory limit to {MAX_MEMORY}MB")
+                    
+                    # Reset configuration and try with virtual device configuration
+                    tf.config.experimental.set_virtual_device_configuration(
+                        physical_devices[0],
+                        [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=MAX_MEMORY)]
+                    )
+                    print(f"Successfully set explicit memory limit for {physical_devices[0].name}")
+            except Exception as e2:
+                print(f"Failed to set explicit memory limit: {e2}. Continuing with default configuration.")
+    else:
+        print("No GPU found by TensorFlow. Running on CPU.")
 
 # Original GPU disabling logic for ARM Macs follows here
 # Disable GPU by default on ARM Macs, it's slower than just using the CPU
-if os.environ.get("CUDA_VISIBLE_DEVICES") == "-1" or (
+if not use_cpu_only and (os.environ.get("CUDA_VISIBLE_DEVICES") == "-1" or (
     sys.platform == "darwin"
     and platform.processor() == "arm"
     and "CUDA_VISIBLE_DEVICES" not in os.environ
-):
+)):
+    print("ARM Mac detected, disabling GPU as it's typically slower than CPU on this platform.")
     tf.config.set_visible_devices([], "GPU")
 
 import microwakeword.data as input_data
