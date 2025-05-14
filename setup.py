@@ -8,7 +8,7 @@ setuptools.setup(
     version="0.1.0",
     install_requires=[
         "audiomentations", # Version managed by consuming project or ensure general compatibility
-        # "audio_metadata", # To be removed/replaced
+        "soundfile",      # Used for audio file metadata and loading
         "datasets",       # Version managed by consuming project
         "mmap_ninja",
         "numpy>=1.21",    # TF 2.19 base image has 2.1.3; ensure compatibility

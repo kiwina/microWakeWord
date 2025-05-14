@@ -117,7 +117,7 @@ class Clips:
                     and (duration < self.max_clip_duration_s)
                 ]
             else:
-                # If not a wave file, use the audio_metadata package to analyze audio file headers for the duration.
+                # If not a wave file, use the soundfile package to analyze audio file headers for the duration.
                 # This is slower!
                 filtered_paths = []
 
