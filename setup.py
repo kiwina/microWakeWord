@@ -14,7 +14,7 @@ setuptools.setup(
         "numpy>=1.21",    # TF 2.19 base image has 2.1.3; ensure compatibility
         # "pymicro-features", # Assuming this is installed locally from a fork
         "pyyaml>=6.0",    # Base image has 6.0.2
-        "tensorflow>=2.19.0,<2.20.0", # Align with base image
+        "tensorflow>=2.18.0,<2.19.0", # Align with base image
         "webrtcvad",
     ],
     author="Kevin Ahrendt",
