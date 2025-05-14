@@ -12,7 +12,7 @@ setuptools.setup(
         "datasets",       # Version managed by consuming project
         "mmap_ninja",
         "numpy>=1.21",    # TF 2.19 base image has 2.1.3; ensure compatibility
-        # "pymicro-features", # Assuming this is installed locally from a fork
+        "pymicro-features",
         "pyyaml>=6.0",    # Base image has 6.0.2
         "tensorflow>=2.18.0,<2.19.0", # Align with base image
         "webrtcvad",
